@@ -1,6 +1,24 @@
 import numpy as np
 
 
+def normalize(points):
+    """
+    Normaize 2D points in homogeneous coordinates
+    Based on a code by Peter Kovesi
+    https://github.com/carandraug/PeterKovesiImage
+    :param points: Image points in homogeneous coordinates
+    :return: T, normalized points
+    """
+    c = points.mean(axis=0, keepdims=True)
+    c[0, 2] = 0
+    outpoints = points-c
+    meandist = np.sqrt(outpoints[:, 0]**2 + outpoints[:, 1]**2).mean()
+    scale = np.sqrt(2) / meandist
+    T = np.array([[scale, 0, -scale*c[0, 0]], [0, scale, -scale*c[0, 1]], [0, 0, 1]])
+    outpoints = (T @ outpoints.T).T
+    return T, outpoints
+
+
 def estimate_fundamental_matrix(p_set, q_set):
     """
     Estimate the fundamental matrix using the normalized 8-point algorithm
@@ -9,11 +27,11 @@ def estimate_fundamental_matrix(p_set, q_set):
     :param q_set: Points on image q
     :return: Fundamental matrix
     """
+    p_h = np.concatenate((p_set, np.ones((len(p_set), 1))), axis=1)
+    q_h = np.concatenate((q_set, np.ones((len(p_set), 1))), axis=1)
     # Normalize points
-    p_normv = np.linalg.norm(p_set, axis=-1)[:, np.newaxis]
-    q_normv = np.linalg.norm(q_set, axis=-1)[:, np.newaxis]
-    p_norm = p_set / p_normv
-    q_norm = q_set / q_normv
+    Tp, p_norm = normalize(p_h)
+    Tq, q_norm = normalize(q_h)
 
     # Row function for homogenoeus linear equation
     row_f = lambda p, q: np.array([p[0] * q[0], p[0] * q[1], p[0],
@@ -21,9 +39,9 @@ def estimate_fundamental_matrix(p_set, q_set):
                                    q[0], q[1], 1])
 
     # Build Y matrix
-    Y = np.zeros((6, len(p_set)))
-    for i, p, q in (p_norm, q_norm):
-        Y[i] = row_f(p, q)
+    Y = np.zeros((len(p_set), 9))
+    for i, (p, q) in enumerate(zip(p_norm, q_norm)):
+        Y[i, :] = row_f(p, q)
 
     # Compute SVD
     _, _, Vt = np.linalg.svd(Y)
@@ -33,15 +51,16 @@ def estimate_fundamental_matrix(p_set, q_set):
 
     # Enforce internal constraint
     U, D, Vt = np.linalg.svd(F_r)
-    D[-1, -1]: 0
-    F = U @ D @ Vt
+    Dm = np.array([[D[0], 0, 0], [0, D[1], 0], [0, 0, 0]])
+    F = U @ Dm @ Vt
 
     # Denormalize
-    F = p_normv.T @ F @ q_normv
+    F = Tp.T @ F @ Tq
+
     return F
 
 
-def evaluate_camera_matrices(p, q, Ps, imshape):
+def evaluate_camera_matrices(p, q, Pp, Pqs):
     """
     Evaluate the different options for camera matrix
     :param p: Test point #1
@@ -50,17 +69,21 @@ def evaluate_camera_matrices(p, q, Ps, imshape):
     :param imshape: Image size
     :return: Correct camera matrix
     """
-    Pp = np.concatenate((np.eye(3), np.zeros(3).T), axis=1)
-    for Pq in Ps:
-        pos3D = triangulate(p, q, Pp, Pq, imshape)
-        pos3D = pos3D / pos3D[3]
-        poscam1 = Pp @ pos3D
-        poscam2 = Pq @ pos3D
+    for Pq in Pqs:
+        pos3D = triangulate(p, q, Pp, Pq)
+        print(pos3D)
+        print(Pp)
+        print(Pq)
+        pos3D = pos3D / pos3D[2]
+        poscam1 = Pp.T @ pos3D.T
+        poscam2 = Pq.T @ pos3D.T
+        print(poscam1)
+        print(poscam2)
         if poscam1[2] > 0 and poscam2[2] > 0:
             return Pq
 
 
-def estimate_camera_matrices_from_fundamental(K, F):
+def estimate_camera_matrices_from_fundamental(K,  F):
     """
     Estimat the camera matrix between two point sets using the fundamental matrix.
     :param K: Intrinsic camera matrix
@@ -80,14 +103,14 @@ def estimate_camera_matrices_from_fundamental(K, F):
     if np.linalg.det(R2) < 0:
         R2 = -R2
     return [
-        K @ np.concatenate((R1, U[:, 2]), axis=1),
-        K @ np.concatenate((R1, -U[:, 2]), axis=1),
-        K @ np.concatenate((R2, U[:, 2]), axis=1),
-        K @ np.concatenate((R2, -U[:, 2]), axis=1)
+        K @ np.concatenate((R1, U[:, 2:]), axis=1),
+        K @ np.concatenate((R1, -U[:, 2:]), axis=1),
+        K @ np.concatenate((R2, U[:, 2:]), axis=1),
+        K @ np.concatenate((R2, -U[:, 2:]), axis=1)
     ]
 
 
-def triangulate(p, q, Pp, Pq, imshape):
+def triangulate(ps, qs, Pp, Pq):
     """
     Traingulate a 2D pair p, q given their point coordinates and the camera matrices
     :param p: Point #1
@@ -97,38 +120,21 @@ def triangulate(p, q, Pp, Pq, imshape):
     :param imshape: Image size
     :return: 3D coordinates of the triangulated point
     """
-    H = np.array([[2.0 / float(imshape[0]), 0, -1],
-                  [0, 2.0 / float(imshape[1]), -1],
-                  [0, 0, 1]])
-
-    # Normalize coordinates
-    if len(p) == 2:
-        p = np.array([p[0], p[1], 1])
-    else:
-        p = p / p[2]
-    if len(q) == 2:
-        q = np.array([q[0], q[1], 1])
-    else:
-        q = q / q[2]
-
-    # Homogeneous coordinates
-    p = H @ p
-    q = H @ q
-    Pp = H @ Pp
-    Pq = H @ Pq
 
     # Compute matrix A
-    A = np.zeros((4, 4))
-    A[0, :] = p[0] * Pp[2, :]
-    A[1, :] = p[1] * Pp[2, :]
-    A[2, :] = q[0] * Pq[2, :]
-    A[3, :] = q[1] * Pq[2, :]
+    A = []
+    for p, q in zip(ps, qs):
+        A.append(p * Pp[2, :] - Pp[0, :])
+        A.append(q * Pq[2, :] - Pq[1, :])
 
-    _, _, Vt = np.linalg.svd(A)
-    return Vt[-1, :]
+    # Calculate best point
+    A = np.array(A)
+    u, d, vt = np.linalg.svd(A)
+    X = vt[-1, 0:3] / vt[-1, 3]  # normalize
+    return X
 
 
-def estimate_camera_matrix(p_set, q_set, K, imshape):
+def estimate_camera_matrices(p_set, q_set, kp, kq, pshape, qshape):
     """
     Estimate the camera matrix given a set of correspondences
     :param p_set: Corresponding points on image #1
@@ -137,8 +143,14 @@ def estimate_camera_matrix(p_set, q_set, K, imshape):
     :param imshape: Image size
     :return:
     """
+    Kp = build_K(kp, pshape[0], pshape[1])
+    Kq = build_K(kq, qshape[0], qshape[1])
     F = estimate_fundamental_matrix(p_set, q_set)
-    Ps = estimate_camera_matrices_from_fundamental(K, F)
-    P = evaluate_camera_matrices(p_set[0], q_set[0], Ps, imshape)
-    return P
+    Pqs = estimate_camera_matrices_from_fundamental(Kq, F)
+    Pp = Kp @ np.concatenate((np.eye(3), np.zeros((3, 1))), axis=1)
+    Pq = evaluate_camera_matrices(p_set[0], q_set[0], Pp, Pqs)
+    return Pp, Pq
 
+
+def build_K(f, imsh0, imsh1):
+    return np.array([[f, 0, float(imsh0)/2], [0, f, float(imsh1)/2], [0, 0, 1]])

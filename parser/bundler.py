@@ -1,5 +1,6 @@
 import os
 import numpy as np
+from matplotlib import pyplot as plt
 
 class Bundler():
     """
@@ -12,6 +13,8 @@ class Bundler():
         self.R = None
         self.t = None
         self.matches = []
+        self.parse_bundler()
+        self.parse_cameras()
 
     @property
     def bundle_path(self):
@@ -51,8 +54,7 @@ class Bundler():
                 self.matches.append(current_m)
 
     def get_image(self, idx):
-        pass
-        # return read_image(self.image_paths[idx])
+        return plt.imread(os.path.join(self.path, self.image_paths[idx][:-1]))
 
 
 
