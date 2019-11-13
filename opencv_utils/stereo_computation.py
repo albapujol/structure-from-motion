@@ -1,6 +1,7 @@
 import numpy as np
 from .epipolar_geometry import estimate_fundamental_matrix
 from PIL import Image
+import cv2
 
 def nullspace(A, atol=1e-13, rtol=0):
     A = np.atleast_2d(A)
@@ -11,63 +12,12 @@ def nullspace(A, atol=1e-13, rtol=0):
     return ns
 
 def  stereorectify(F, ph, qh):
-    e2 = nullspace(F).flatten()
-    mirror = e2[0] < 0
-
-    d = max(np.sqrt(e2[0]**2+e2[1]**2), 1e-7)
-    alpha = e2[0]/d
-    beta = e2[1]/d
-    R = np.array([[alpha, beta, 0], [-beta, alpha, 0], [0, 0, 1]])
-    e2 = R @ e2
-    print(R)
-
-    if abs(e2[2]) < 1e-6*abs(e2[0]):
-        invf = 0
-    else:
-        invf = -e2[2]/e2[0]
-    G = np.array([[1, 0, 0], [0, 1, 0], [invf, 0, 1]])
-    H2 = G @ R
-
-    e2 = nullspace(F).flatten()
-    e2_x = np.array([[0, -e2[2], e2[1]],
-                     [e2[2], 0, e2[0]],
-                     [-e2[1], e2[0], 0]])
-    e2_111 = np.array([[e2[0], e2[0], e2[0]],
-                       [e2[1], e2[1], e2[1]],
-                       [e2[2], e2[2], e2[2]]])
-    H0 = H2 @ (e2_x @ F + e2_111)
-
-    A = (H0 @ ph.T).T
-    A = A / (A[:, 2].reshape(10, 1))
-    B = H2 @ qh.T
-    B = B[1, :]
-
-    X, _, _, _ = np.linalg.lstsq(A, B, rcond=-1)
-
-    Ha = np.array([[X[0], X[1], X[2]], [0, 1, 0], [0, 0, 1]])
-    H1 = Ha @ H0
-
-    if mirror:
-        mm = np.array([[-1, 0, 0], [0, -1, 0], [0, 0, 1]])
-        H1 = mm @ H1
-        H2 = mm @ H2
-
+    _, H1, H2 = cv2.stereoRectifyUncalibrated(ph[:, :-1].ravel(), qh[:, :-1].ravel(), F, (1000, 1000))
     return H1, H2
 
 
 def apply_H(im, H):
-    inv_homography_matrix = np.linalg.inv(H)
-    inv_homography_matrix /= inv_homography_matrix[2, 2]
-    homography_param = inv_homography_matrix.ravel()
-    print(H)
-
-    transformed_img = Image.fromarray(im).transform(
-        size=im.shape[0:2],
-        method=Image.PERSPECTIVE,
-        data=homography_param,
-        resample=Image.BICUBIC
-    )
-    return np.array(transformed_img)
+    return cv2.warpPerspective(im, H, (1000,1000))
 
 def stereo_computation(left_im, right_im, p, q, min_disp, max_disp, winsize, cost_f):
     h, w = left_im.shape
@@ -81,7 +31,7 @@ def stereo_computation(left_im, right_im, p, q, min_disp, max_disp, winsize, cos
     measures[3,:] = Hp * np.array([h, w, 1]).T
     measures[4,:] = Hq * np.array([0, 0, 1]).T
     measures[5,:] = Hq * np.array([h, 0, 1]).T
-    measures[6, :] = Hq * np.array([0, w, 1]).T
+    measures[6,:] = Hq * np.array([0, w, 1]).T
     measures[7,:] = Hq * np.array([h, w, 1]).T
     measures = measures / measures[:, 3]
 
@@ -92,8 +42,8 @@ def stereo_computation(left_im, right_im, p, q, min_disp, max_disp, winsize, cos
     corners[3] = max(measures[:, 3])
     corners = corners.round()
 
-    left_im_r = apply_H_v2(left_im, Hp, corners)
-    right_im_r = apply_H_v2(right_im, Hq, corners)
+    left_im_r = apply_H(left_im, Hp, corners)
+    right_im_r = apply_H(right_im, Hq, corners)
 
     winstep = np.ceil(winsize / 2) - 1
     dispmap = np.zeros((h, w))
