@@ -177,8 +177,8 @@ def triangulateN(points, Ps):
     # Compute matrix A
     A = []
     for ps, Pp in zip(points, Ps):
-        A.append(-ps[1] * Pp[2, :] + Pp[0, :])
-        A.append(ps[0] * Pp[2, :] - Pp[1, :])
+        A.append(-ps[0] * Pp[2, :] + Pp[0, :])
+        A.append(ps[1] * Pp[2, :] - Pp[1, :])
     # Calculate best point
     A = np.array(A)
     u, d, vt = np.linalg.svd(A)

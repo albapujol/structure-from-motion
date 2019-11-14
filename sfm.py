@@ -44,9 +44,9 @@ def main():
 
     # visualization.point_cloud.view_cloud(bundle.gt_points[:10], bundle.gt_colors[:10])
 
-    points, colors = sfm.sparse_bundler_reconstruction.sparse_bundler_reconstuction(bundle, max_points=1)
-    print(bundle.gt_points[0])
-    print(points[0])
+    points, colors = sfm.sparse_bundler_reconstruction.sparse_bundler_reconstuction(bundle, max_points=2)
+    print(bundle.gt_points[1])
+    print(points[1])
     # points, colors = sfm.sparse_bundler_reconstruction.sparse_bundler_reconstuction(bundle, max_points=1000)
     # visualization.point_cloud.view_cloud(bundle.gt_points[:1000], bundle.gt_colors[:1000])
     #

@@ -95,7 +95,7 @@ class Bundler:
         R = self.R[idx]
         t = self.t[idx]
         T = np.eye(4)
-        T[0:3, 0:3] = R.T
+        T[0:3, 0:3] = R
         T[0:3, 3] = t
         return T
 
@@ -107,8 +107,8 @@ class Bundler:
         """
         f = self.k[idx][0]
         # cx, cy = self.get_image_size(idx)[0:2]/2
-        # K = np.array([[f, 0, 0], [0, f, 0], [0, 0, 1]])
-        K = np.eye(3)
+        K = np.array([[f, 0, 0], [0, f, 0], [0, 0, 1]])
+        # K = np.eye(3)
         return K
 
     def get_camera_matrix(self, idx):
@@ -130,8 +130,8 @@ class Bundler:
         pb = []
         for m in self.matches:
             if idxa in m and idxb in m:
-                    pa.append(m[idxa])
-                    pb.append(m[idxb])
+                    pa.append(-m[idxa])
+                    pb.append(-m[idxb])
         if undistorted:
             return (Bundler._undistort(np.array(pa), self.k[idxa]),
                     Bundler._undistort(np.array(pb), self.k[idxb]))
@@ -179,8 +179,12 @@ class Bundler:
         :param k: Intrinsic parameters in the format [f, k1, k2]
         :return: Undistorted points
         """
+        ## ATTENTION ## -- Inverting the points coming from the datasets
+        points = -points
+        ###
         if len(points) == 0:
             return points
         points /= k[0]
-        rp = 1.0 + k[1] * (points[:, 0]**2+points[:, 1]**2) + k[2] * (points[:, 0]**2+points[:, 1]**2)**2
-        return points * rp.reshape(len(points), 1)
+        r = np.linalg.norm(points, axis=1)
+        rp = 1.0 + k[1] * r**2 + k[2] * r**4
+        return points * rp.reshape(len(points), 1) * k[0]
