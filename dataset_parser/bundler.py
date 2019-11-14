@@ -12,6 +12,8 @@ class Bundler:
         self.k = None
         self.R = None
         self.t = None
+        self.gt_points = []
+        self.gt_colors = []
         self.matches = []
         self.parse_bundler()
         self.parse_cameras()
@@ -57,13 +59,15 @@ class Bundler:
                 self.R[elem][2] = [float(w) for w in f.readline().split()]
                 self.t[elem] = [float(w) for w in f.readline().split()]
             for elem in range(num_points):
-                _ = f.readline() # Discard 3D information
-                _ = f.readline() # Discard color information
+                self.gt_points.append([float(w) for w in f.readline().split()]) # Discard 3D information
+                self.gt_colors.append([float(w) for w in f.readline().split()]) # Discard color information
                 viewlist = f.readline().split()
                 current_m = {}
                 for m in range(int(viewlist[0])):
                     current_m[int(viewlist[m*4+1])] = [float(viewlist[m*4+3]), float(viewlist[m*4+4])]
                 self.matches.append(current_m)
+        self.gt_points = np.array(self.gt_points)
+        self.gt_colors = np.array(self.gt_colors)/255.0
 
     def get_image(self, idx, undistorted=False):
         """Get image from index
@@ -91,7 +95,7 @@ class Bundler:
         R = self.R[idx]
         t = self.t[idx]
         T = np.eye(4)
-        T[0:3, 0:3] = -R.T
+        T[0:3, 0:3] = R.T
         T[0:3, 3] = t
         return T
 
@@ -134,6 +138,21 @@ class Bundler:
         else:
             return np.array(pa), np.array(pb)
 
+    def get_im_points(self, idx, undistorted=False):
+        """ Get all detected points on a specific image
+        :param idx: Index of the image
+        :param undistorted: If the points are undistorted
+        :return: Array of points
+        """
+        p = []
+        for m in self.matches:
+            if idx in m:
+                    p.append(m[idx])
+        if undistorted:
+            return Bundler.undistort(np.array(p), self.k[idx])
+        else:
+            return np.array(p)
+
     def get_corres_n(self, idxes, undistorted=True):
         """ Get correspondences between N images
         Get the correpsondence list between two different images
@@ -147,13 +166,13 @@ class Bundler:
                 for q, i in enumerate(idxes):
                     pouts[q].append(m[i])
         if undistorted:
-            return [Bundler._undistort(np.array(p), self.k[i]) for p, i in zip(pouts, idxes)]
+            return [Bundler.undistort(np.array(p), self.k[i]) for p, i in zip(pouts, idxes)]
         else:
             return [np.array(p) for p in pouts]
 
 
     @staticmethod
-    def _undistort(points, k):
+    def undistort(points, k):
         """
         Undistort a list of points given the parameters K
         :param points: Array of points to be undistorted

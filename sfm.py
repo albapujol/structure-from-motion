@@ -4,6 +4,8 @@ import utils.stereo_computation
 import utils.epipolar_geometry
 import sfm.sparse_2cam_reconstruction
 import sfm.sparse_Ncam_reconstruction
+import sfm.sparse_bundler_reconstruction
+
 import numpy as np
 import matplotlib.pyplot as plt
 import visualization.point_cloud
@@ -33,13 +35,22 @@ def main():
 
     bundle = dataset_parser.Bundler(args.path)
 
-    print(bundle.image_paths[0])
     # im0, im1 = args.images[0], args.images[1]
     # points, colors = sfm.sparse_2cam_reconstruction.sparse_2cam_reconstuction(bundle, im0, im1)
     # visualization.point_cloud.view_cloud(points, colors=colors)
 
-    points, colors = sfm.sparse_Ncam_reconstruction.sparse_Ncam_reconstuction(bundle, args.images)
-    visualization.point_cloud.view_cloud(points, colors=colors)
+    # points, colors = sfm.sparse_Ncam_reconstruction.sparse_Ncam_reconstuction(bundle, args.images)
+    # visualization.point_cloud.view_cloud(points, colors=colors)
+
+    # visualization.point_cloud.view_cloud(bundle.gt_points[:10], bundle.gt_colors[:10])
+
+    points, colors = sfm.sparse_bundler_reconstruction.sparse_bundler_reconstuction(bundle, max_points=1)
+    print(bundle.gt_points[0])
+    print(points[0])
+    # points, colors = sfm.sparse_bundler_reconstruction.sparse_bundler_reconstuction(bundle, max_points=1000)
+    # visualization.point_cloud.view_cloud(bundle.gt_points[:1000], bundle.gt_colors[:1000])
+    #
+    # visualization.point_cloud.view_cloud(points, colors=colors)
 
     #
     # p1, p2 = bundle.get_corres(args.images[0], args.images[1])

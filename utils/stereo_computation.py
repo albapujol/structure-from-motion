@@ -10,6 +10,7 @@ def nullspace(A, atol=1e-13, rtol=0):
     ns = vh[nnz:].conj().T
     return ns
 
+
 def  stereorectify(F, ph, qh):
     e2 = nullspace(F).flatten()
     mirror = e2[0] < 0
@@ -19,7 +20,6 @@ def  stereorectify(F, ph, qh):
     beta = e2[1]/d
     R = np.array([[alpha, beta, 0], [-beta, alpha, 0], [0, 0, 1]])
     e2 = R @ e2
-    print(R)
 
     if abs(e2[2]) < 1e-6*abs(e2[0]):
         invf = 0

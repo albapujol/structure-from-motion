@@ -105,7 +105,7 @@ def evaluate_camera_matrices(p, q, Pp, Pqs):
     :return: Correct camera matrix
     """
     for Pq in Pqs:
-        pos3D = triangulate(p, q, Pp, Pq)
+        pos3D = triangulate2(p, q, Pp, Pq)
         pos3D = pos3D / pos3D[2]
         poscam1 = Pp.T @ pos3D.T
         poscam2 = Pq.T @ pos3D.T
@@ -155,10 +155,10 @@ def triangulate2(ps, qs, Pp, Pq):
     """
     # Compute matrix A
     A = []
-    A.append(ps[0] * Pp[2, :] - Pp[0, :])
-    A.append(ps[1] * Pp[2, :] - Pp[1, :])
-    A.append(qs[0] * Pq[2, :] - Pq[0, :])
-    A.append(qs[1] * Pq[2, :] - Pq[1, :])
+    A.append(ps[1] * Pp[2, :] - Pp[0, :])
+    A.append(ps[0] * Pp[2, :] - Pp[1, :])
+    A.append(qs[1] * Pq[2, :] - Pq[0, :])
+    A.append(qs[0] * Pq[2, :] - Pq[1, :])
     # Calculate best point
     A = np.array(A)
 
@@ -177,8 +177,8 @@ def triangulateN(points, Ps):
     # Compute matrix A
     A = []
     for ps, Pp in zip(points, Ps):
-        A.append(ps[0] * Pp[2, :] - Pp[0, :])
-        A.append(ps[1] * Pp[2, :] - Pp[1, :])
+        A.append(-ps[1] * Pp[2, :] + Pp[0, :])
+        A.append(ps[0] * Pp[2, :] - Pp[1, :])
     # Calculate best point
     A = np.array(A)
     u, d, vt = np.linalg.svd(A)
