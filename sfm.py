@@ -8,18 +8,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import image_cloud_io.point_cloud
 
-def print_GT_transform(b, im0, im1):
-    R1 = b.R[im0]
-    R2 = b.R[im1]
-    t1 = b.t[im0]
-    t2 = b.t[im1]
-    T1 = np.eye(4)
-    T1[0:3, 0:3] = R1
-    T1[0:3, 3] = t1
-    T2 = np.eye(4)
-    T2[0:3, 0:3] = R2
-    T2[0:3, 3] = t2
-    return np.linalg.inv(T1) @ T2
+
+def create_points(matches, idxes):
+    out_matches = []
+    for m_dict in matches:
+        d = {i: m_dict[idx] for i, idx in enumerate(idxes) if idx in m_dict}
+        if len(d) >= 2:
+            out_matches.append(d)
+    return out_matches
 
 
 def main():
@@ -39,6 +35,8 @@ def main():
                         help="Colorize the point cloud")
     parser.add_argument('--save', type=str, default='',
                         help="Save the resulting point cloud on the specified file")
+    parser.add_argument('--demo', action='store_true',
+                        help="Execute demo registration with proposed interface")
 
     args = parser.parse_args()
 
@@ -58,7 +56,17 @@ def main():
 
     # SPARSE RECONSTRUCTION
     elif args.reconstruction_type == 'sparse':
-        if len(args.images) == 2:
+        if args.demo:
+            bundle = dataset_parser.Bundler(args.path)
+            img_idxes = args.images
+            images = [bundle.get_image(i) for i in img_idxes]
+            camera_matrices = [bundle.get_camera_matrix(i) for i in img_idxes]
+            ks = [bundle.k[i] for i in img_idxes]
+            pair_dict = create_points(bundle.matches, img_idxes)
+            points, colors = sfm.sparse_reconstruction.sparse_bundle_reconstruction_data(images, pair_dict,
+                                                                                         camera_matrices, ks,
+                                                                                         colorize=True)
+        elif len(args.images) == 2:
             im0, im1 = args.images[0], args.images[1]
             print("Performing 2 image sparse reconstruction with images %s and %s" % (im0, im1))
             points, colors = sfm.sparse_reconstruction.sparse_2cam_reconstuction(bundle, im0, im1,
@@ -80,9 +88,6 @@ def main():
             image_cloud_io.point_cloud.save_cloud(points, colors=colors, path=args.save)
         if args.view:
             image_cloud_io.point_cloud.view_cloud(points, colors=colors)
-
-
-
 
 
 if __name__ == '__main__':

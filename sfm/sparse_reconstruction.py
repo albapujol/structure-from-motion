@@ -1,7 +1,7 @@
 import utils.epipolar_geometry
 import utils.colors
 import numpy as np
-import dataset_parser
+import dataset_parser.bundler
 
 
 def _pair_color(bundle, im0, im1):
@@ -105,33 +105,34 @@ def sparse_bundle_reconstuction(bundle, image_list, colorize=True):
     return np.array(points), np.array(colors)
 
 
-# def sparse_bundle_reconstruction_data(image_files, pair_dict, camera_matrices, colorize=True):
-#     """"Perform a sparse reconstruction between N images using a bundle triangulation.
-#
-#     :param image_list: List of all the iamge paths
-#     :param pair_dict: List of dictionaries containing all matching points in Bundler format
-#     :param camera_matrices: Camera matrices / distortion coefficients for all images
-#     :param colorize:  Also extract the color information
-#     :return: Arrays with reconstructed points and (optionally) colors
-#     """
-#     points = []
-#     colors = np.array([]).reshape((0, 3))
-#     image_list = set(range(image_files))
-#     for corres_points in pair_dict:
-#         image_set_in_corres = image_list.intersection(corres_points.keys())
-#         if len(image_set_in_corres) < 2:
-#             continue
-#         query_points_it = np.zeros((len(image_set_in_corres), 2))
-#         color_points_it = []
-#         Ps= []
-#         for i, key in enumerate(image_set_in_corres):
-#             coords_und = dataset_parser.Bundle.undistort(np.array([corres_points[key]]), bundle.k[key]).flatten()
-#             query_points_it[i] = coords_und
-#             Ps.append(bundle.get_camera_matrix(key))
-#             image = bundle.get_image(key)
-#             if colorize:
-#                 color_points_it.append(utils.colors.get_colors_from_image(image, corres_points[key]))
-#         points.append(utils.epipolar_geometry.triangulateN(query_points_it, Ps))
-#         if colorize:
-#             colors = np.concatenate((colors, utils.colors.merge_colors(*color_points_it)))
-#     return np.array(points), np.array(colors)
+def sparse_bundle_reconstruction_data(images, pair_dict, camera_matrices, ks, colorize=True):
+    """"Perform a sparse reconstruction between N images using a bundle triangulation.
+
+    :param image_list: List of all the iamge paths
+    :param pair_dict: List of dictionaries containing all matching points in Bundler format
+    :param camera_matrices: Camera matrices / distortion coefficients for all images
+    :param colorize:  Also extract the color information
+    :return: Arrays with reconstructed points and (optionally) colors
+    """
+    points = []
+    colors = np.array([]).reshape((0, 3))
+    image_list = set(range(len(images)))
+    for corres_points in pair_dict:
+        image_set_in_corres = image_list.intersection(corres_points.keys())
+        if len(image_set_in_corres) < 2:
+            continue
+        query_points_it = np.zeros((len(image_set_in_corres), 2))
+        color_points_it = []
+        Ps= []
+        for i, key in enumerate(image_set_in_corres):
+            coords_und = dataset_parser.bundler.Bundler.undistort(np.array([corres_points[key]]),
+                                                                  ks[key].flatten()).flatten()
+            query_points_it[i] = coords_und
+            Ps.append(camera_matrices[i])
+            image = images[key]
+            if colorize:
+                color_points_it.append(utils.colors.get_colors_from_image(image, corres_points[key]))
+        points.append(utils.epipolar_geometry.triangulateN(query_points_it, Ps))
+        if colorize:
+            colors = np.concatenate((colors, utils.colors.merge_colors(*color_points_it)))
+    return np.array(points), np.array(colors)
