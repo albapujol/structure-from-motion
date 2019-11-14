@@ -48,6 +48,13 @@ class Bundler:
 
         :return: None
         """
+        self.image_paths = []
+        self.k = None
+        self.R = None
+        self.t = None
+        self.gt_points = []
+        self.gt_colors = []
+        self.matches = []
         with open(self.bundle_path, 'r') as f:
             # Discard initial lines
             l = '#'
@@ -116,9 +123,7 @@ class Bundler:
         :return: Extrinsics matrix
         """
         f = self.k[idx][0]
-        # cx, cy = self.get_image_size(idx)[0:2]/2
         K = np.array([[f, 0, 0], [0, f, 0], [0, 0, 1]])
-        # K = np.eye(3)
         return K
 
     def get_camera_matrix(self, idx):

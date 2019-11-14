@@ -70,8 +70,8 @@ def main():
                                                                                  colorize=args.colorize)
             elif args.reconstruction_method == 'bundle':
                 print("Performing bundle sparse reconstruction")
-                points, colors = sfm.sparse_reconstruction.sparse_bundler_reconstuction(bundle, args.images,
-                                                                                 colorize=args.colorize)
+                points, colors = sfm.sparse_reconstruction.sparse_bundle_reconstuction(bundle, args.images,
+                                                                                       colorize=args.colorize)
             else:
                 print("Method not understood")
                 return -1
