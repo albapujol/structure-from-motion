@@ -2,13 +2,11 @@ import argparse
 import dataset_parser
 import utils.stereo_computation
 import utils.epipolar_geometry
-import sfm.sparse_2cam_reconstruction
-import sfm.sparse_Ncam_reconstruction
-import sfm.sparse_bundler_reconstruction
+import sfm.sparse_reconstruction
 
 import numpy as np
 import matplotlib.pyplot as plt
-import visualization.point_cloud
+import image_cloud_io.point_cloud
 
 def print_GT_transform(b, im0, im1):
     R1 = b.R[im0]
@@ -25,71 +23,65 @@ def print_GT_transform(b, im0, im1):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('--images', type=int, nargs='+',
-                        help='Input images to the SfM algorithm')
+    parser = argparse.ArgumentParser(description='Structure From Motion coding test uding the Photo Tourism dataset.')
     parser.add_argument('--path', type=str,
-                        help='Path containing the dataset')
+                        help='Path to the *.out file containing the bundler data')
+    parser.add_argument('--images', type=int, nargs='+',
+                        help='Input images to the SfM algorithm (int indexes). '
+                             'The method will fail if a number larger than the dataset size is specified')
+    parser.add_argument('--reconstruction_type', type=str, default='sparse',
+                        help="Type of reconstruction: 'dense' or 'sparse'. Defaults to 'sparse'")
+    parser.add_argument('--reconstruction_method', type=str, default='bundle',
+                        help="Method to perform the reconstruction: either 'pair' or 'bundle'. Defaults to 'bundle'")
+    parser.add_argument('--view', action='store_true',
+                        help="View the resulting point cloud in an X window")
+    parser.add_argument('--colorize', action='store_true',
+                        help="Colorize the point cloud")
+    parser.add_argument('--save', type=str, default='',
+                        help="Save the resulting point cloud on the specified file")
 
     args = parser.parse_args()
 
+    # Exit if not enough images are given
+    if len(args.images) < 2:
+        print("Expected at least 2 image indexes to perform the registration")
+        return -1
+
+    if not args.view and not args.save:
+        print("WARNING: not view or save path specified. The algorithm will not output anything")
+
     bundle = dataset_parser.Bundler(args.path)
 
-    # im0, im1 = args.images[0], args.images[1]
-    # points, colors = sfm.sparse_2cam_reconstruction.sparse_2cam_reconstuction(bundle, im0, im1)
-    # visualization.point_cloud.view_cloud(points, colors=colors)
+    # DENSE RECONSTRUCTION
+    if args.reconstruction_type == 'dense':
+        raise NotImplementedError("The dense reconstruction is not implemented")
 
-    # points, colors = sfm.sparse_Ncam_reconstruction.sparse_Ncam_reconstuction(bundle, args.images)
-    # visualization.point_cloud.view_cloud(points, colors=colors)
-
-    # visualization.point_cloud.view_cloud(bundle.gt_points[:10], bundle.gt_colors[:10])
-
-    points, colors = sfm.sparse_bundler_reconstruction.sparse_bundler_reconstuction(bundle, max_points=2)
-    print(bundle.gt_points[1])
-    print(points[1])
-    # points, colors = sfm.sparse_bundler_reconstruction.sparse_bundler_reconstuction(bundle, max_points=1000)
-    # visualization.point_cloud.view_cloud(bundle.gt_points[:1000], bundle.gt_colors[:1000])
-    #
-    # visualization.point_cloud.view_cloud(points, colors=colors)
-
-    #
-    # p1, p2 = bundle.get_corres(args.images[0], args.images[1])
-    #
-    # print(print_GT_transform(bundle, args.images[0], args.images[1]))
-    #
-    # ph = np.concatenate((p1, np.ones((len(p1), 1))), axis=1)
-    # qh = np.concatenate((p2, np.ones((len(p2), 1))), axis=1)
-    #
-    # F = utils.epipolar_geometry.estimate_fundamental_matrix(ph, qh)
-    # print('Fundamental')
-    # print(F)
-    #
-    # H1, H2 = utils.stereo_computation.stereorectify(F, ph, qh)
-    # print('Hs')
-    # print(H1)
-    # print(H2)
-    # print("ends")
-    #
-    #
-    # im1 = b.get_image(args.images[0])
-    # im2 = b.get_image(args.images[1])
-    # plt.imshow(utils.stereo_computation.apply_H(im1, H2))
-    # plt.show()
-    # plt.imshow(utils.stereo_computation.apply_H(im2, H1))
-    # plt.show()
+    # SPARSE RECONSTRUCTION
+    elif args.reconstruction_type == 'sparse':
+        if len(args.images) == 2:
+            im0, im1 = args.images[0], args.images[1]
+            print("Performing 2 image sparse reconstruction with images %s and %s" % (im0, im1))
+            points, colors = sfm.sparse_reconstruction.sparse_2cam_reconstuction(bundle, im0, im1,
+                                                                                 colorize=args.colorize)
+        else:
+            if args.reconstruction_method == 'pair':
+                print("Performing pairwise sparse reconstruction")
+                points, colors = sfm.sparse_reconstruction.sparse_Ncam_reconstuction(bundle, args.images,
+                                                                                 colorize=args.colorize)
+            elif args.reconstruction_method == 'bundle':
+                print("Performing bundle sparse reconstruction")
+                points, colors = sfm.sparse_reconstruction.sparse_bundler_reconstuction(bundle, args.images,
+                                                                                 colorize=args.colorize)
+            else:
+                print("Method not understood")
+                return -1
+        print("Reconstructed %s points" % (len(points)))
+        if args.save:
+            image_cloud_io.point_cloud.save_cloud(points, colors=colors, path=args.save)
+        if args.view:
+            image_cloud_io.point_cloud.view_cloud(points, colors=colors)
 
 
-
-    # Pp, Pq = estimate_camera_matrices(p1, p2)
-
-
-    # Read input data
-
-    # Undistort input images
-
-    # Estimate essential matrix
-
-    # Estimate relative pose
 
 
 

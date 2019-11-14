@@ -1,9 +1,9 @@
 # Computing
 numpy==1.17.4
 
-
 # Visualization & I/O
 matplotlib==3.1.1
 pillow==6.2.1
 ipython==7.9.0
-open3d
+open3d==0.8.0.0
+open3d-python==0.7.0.0

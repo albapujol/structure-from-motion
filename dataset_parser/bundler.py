@@ -1,13 +1,14 @@
 import os
 import numpy as np
-from matplotlib import pyplot as plt
-
+import image_cloud_io.image
 
 class Bundler:
-    """Class to parse files inputted by bundler
+    """Class to parse files inputted by Bundler.
+
+    Giving the file path
     """
     def __init__(self, path):
-        self.path = path
+        self.bundle_path = path
         self.image_paths = []
         self.k = None
         self.R = None
@@ -19,21 +20,24 @@ class Bundler:
         self.parse_cameras()
 
     @property
-    def bundle_path(self):
-        """Property to get bundle file path
+    def path(self):
+        """Property to get the paht of the dataset
+
         :return: Bundle file path
         """
-        return os.path.join(self.path, 'notredame.out')
+        return os.path.dirname(self.bundle_path)
 
     @property
     def image_list_path(self):
         """Get image list path
+
         :return: Image list path
         """
         return os.path.join(self.path, 'list.txt')
 
     def parse_cameras(self):
         """Parse camera file into class
+
         :return: None
         """
         with open(self.image_list_path, 'r') as f:
@@ -41,6 +45,7 @@ class Bundler:
 
     def parse_bundler(self):
         """Parse bundler file into class
+
         :return: None
         """
         with open(self.bundle_path, 'r') as f:
@@ -71,6 +76,7 @@ class Bundler:
 
     def get_image(self, idx, undistorted=False):
         """Get image from index
+
         :param idx: Index of the image (int)
         :param undistorted: If the image needs to be previously undistorted
         :return: Numpy array containing the image
@@ -78,10 +84,11 @@ class Bundler:
         if undistorted:
             raise NotImplementedError
         else:
-            return plt.imread(os.path.join(self.path, self.image_paths[idx][:-1]))
+            return image_cloud_io.image.read_image(os.path.join(self.path, self.image_paths[idx][:-1]))
 
     def get_image_size(self, idx):
         """Get image size
+
         :param idx: Index to get the image size for
         :return: Image size (3-elem)
         """
@@ -89,6 +96,7 @@ class Bundler:
 
     def get_extrinsics(self, idx):
         """Get extrinsics matrix for index i
+
         :param idx: Index to get the extrinsics matrix
         :return: Extrinsics matrix
         """
@@ -101,7 +109,9 @@ class Bundler:
 
     def get_intrinsics(self, idx):
         """Get intrinsics matrix for index i
+
         This function assumes that the pixels are already centered at image center.
+
         :param idx: Index to get the extrinsics matrix
         :return: Extrinsics matrix
         """
@@ -120,7 +130,7 @@ class Bundler:
 
     def get_corres(self, idxa, idxb, undistorted=True):
         """ Get correspondences between two images
-        Get the correpsondence list between two different images
+
         :param idxa: Index of the image A
         :param idxb: Index of the image B
         :param undistorted: If the points are undistorted
@@ -130,16 +140,17 @@ class Bundler:
         pb = []
         for m in self.matches:
             if idxa in m and idxb in m:
-                    pa.append(-m[idxa])
-                    pb.append(-m[idxb])
+                    pa.append(m[idxa])
+                    pb.append(m[idxb])
         if undistorted:
-            return (Bundler._undistort(np.array(pa), self.k[idxa]),
-                    Bundler._undistort(np.array(pb), self.k[idxb]))
+            return (Bundler.undistort(np.array(pa), self.k[idxa]),
+                    Bundler.undistort(np.array(pb), self.k[idxb]))
         else:
             return np.array(pa), np.array(pb)
 
     def get_im_points(self, idx, undistorted=False):
         """ Get all detected points on a specific image
+
         :param idx: Index of the image
         :param undistorted: If the points are undistorted
         :return: Array of points
@@ -155,7 +166,7 @@ class Bundler:
 
     def get_corres_n(self, idxes, undistorted=True):
         """ Get correspondences between N images
-        Get the correpsondence list between two different images
+
         :param idxes: Index of the images
         :param undistorted: If the points are undistorted
         :return: Arrays of matching points
@@ -173,13 +184,14 @@ class Bundler:
 
     @staticmethod
     def undistort(points, k):
-        """
-        Undistort a list of points given the parameters K
+        """Undistort a list of points given the parameters K
+
+        ## ATTENTION ## -- Inverting the points coming from the datasets
+
         :param points: Array of points to be undistorted
         :param k: Intrinsic parameters in the format [f, k1, k2]
         :return: Undistorted points
         """
-        ## ATTENTION ## -- Inverting the points coming from the datasets
         points = -points
         ###
         if len(points) == 0:

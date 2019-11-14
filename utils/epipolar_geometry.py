@@ -69,7 +69,17 @@ def compute_fundamental_inliers(p_set, q_set, F, th):
     return np.argwhere(abs(d) < th).flatten()
 
 
-def estimate_fundamental_matrix_ransac(p_set, q_set, th=2.0):
+def estimate_fundamental_matrix_ransac(p_set, q_set, th=0.1):
+    """Estimate the fundamental matrix from a set of correspondences using RANSAC
+
+    The correspondences are given already undistorted and in correpsonding (m,n)
+    coordinates to the XYZ world as:
+
+    :param p_set: Correspondence set #1
+    :param q_set: Corrrespondece set #2
+    :param th: Threshold for the ransac algorithm
+    :return:
+    """
     it = 0
     max_it = 1000
     best_inliers = []
